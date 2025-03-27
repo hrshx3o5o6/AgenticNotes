@@ -1,0 +1,21 @@
+{
+  "name": "notesparse",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "type": "module",
+  "dependencies": {
+    "@langchain/community": "^0.3.37",
+    "@langchain/core": "^0.3.43",
+    "@langchain/ollama": "^0.2.0",
+    "@supabase/supabase-js": "^2.49.3",
+    "langchain": "^0.3.19",
+    "pdf-parse": "^1.1.1",
+    "tesseract.js": "^6.0.0"
+  }
+}
