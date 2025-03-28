@@ -13,6 +13,7 @@ import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { SupabaseVectorStore} from "@langchain/community/vectorstores/supabase"
 import { createClient } from "@supabase/supabase-js";
+import {ReActSingleInputOutputParser} from "langchain/agents/react/output_parser"
 
 // ✅ Load environment variables
 dotenv.config();
@@ -127,6 +128,7 @@ let executor;
             llm: chatModel,
             tools: tools,
             prompt: prompt,
+            outputParser: ReActSingleInputOutputParser(),
         });
 
         // ✅ Initialize the AI agent
@@ -145,4 +147,46 @@ let executor;
     }
 })();
 
+// Create the initialization function
+async function initializeAI() {
+    const extractedText = await extractTextFromPDF(pdfPath);
+    const retriever = await storeNotesInVectorStore(extractedText);
+    
+    const chatModel = new ChatOllama({
+        baseUrl: "http://localhost:11434",
+        model: "llama3.1:latest"
+    });
+
+    const retrieverTool = createRetrieverTool(retriever, {
+        name: "notes-search",
+        description: "Searches and returns relevant information from handwritten notes.",
+    });
+
+    const webSearchTool = new TavilySearchResults({
+        apiKey: process.env.TAVILY_API_KEY,
+    });
+
+    const tools = [retrieverTool, webSearchTool];
+    
+    const prompt = ChatPromptTemplate.fromMessages([
+        ["system", "You are a helpful AI assistant that uses the provided PDF and tools to answer questions. Available tools: {tools}. Tool names: {tool_names}."],
+        ["human", "{input}"],
+        ["assistant", "{agent_scratchpad}"]
+    ]);
+
+    const agent = await createReactAgent({
+        llm: chatModel,
+        tools: tools,
+        prompt: prompt,
+    });
+
+    return new AgentExecutor({
+        agent,
+        tools,
+        verbose: true,
+    });
+}
+
+// Remove the IIFE and export the initialization function
+export { initializeAI };
 export { executor };
