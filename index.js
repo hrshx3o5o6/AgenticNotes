@@ -13,7 +13,8 @@ import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { SupabaseVectorStore} from "@langchain/community/vectorstores/supabase"
 import { createClient } from "@supabase/supabase-js";
-import {ReActSingleInputOutputParser} from "langchain/agents/react/output_parser"
+// import {ReActSingleInputOutputParser} from "langchain/agents/react/output_parser"
+import { StructuredOutputParser } from "@langchain/core/output_parsers";
 
 // ✅ Load environment variables
 dotenv.config();
@@ -38,7 +39,7 @@ async function extractTextFromPDF(pdfPath) {
         const dataBuffer = fs.readFileSync(pdfPath); // Read the PDF file
         console.log("\n🔄 Parsing PDF...");
         
-        const pdfData = await pdfParse(dataBuffer); // Extract raw text
+        const pdfData = await pdfParse(dataBuffer, {timeout: 200000}); // Extract raw text
 
         console.log("\n✅ PDF successfully parsed!");
         return pdfData.text;
@@ -128,7 +129,10 @@ let executor;
             llm: chatModel,
             tools: tools,
             prompt: prompt,
-            outputParser: ReActSingleInputOutputParser(),
+            outputParser: new StructuredOutputParser({
+                output_key: "answer",
+                verbose: true,
+            }),
         });
 
         // ✅ Initialize the AI agent
