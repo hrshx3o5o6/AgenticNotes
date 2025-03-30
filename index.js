@@ -211,17 +211,31 @@ async function storeNotesInVectorStore(notesText) {
 //     }
 // })();
 
-async function processMultiplePDFs(pdfDirectory){
+async function processMultiplePDFs(pdfDirectory) {
     const pdfFiles = glob.sync(path.join(pdfDirectory, "*.pdf"));
     console.log(`\n📂 Processing PDFs... Found ${pdfFiles.length} PDF files`);
 
     let allText = '';
-    for ( const pdfFile of pdfFiles) {
-        console.log("\n📂 Processing PDF: ", pdfFile);
+    let allAnalysis = [];
+
+    for (const pdfFile of pdfFiles) {
+        console.log(`\n📂 Processing PDF: ${pdfFile}`);
+        // Process exam paper analysis
+        const analysis = await processExamPaper(pdfFile);
+        console.log("\n📊 Question Analysis for", path.basename(pdfFile));
+        analysis.forEach(({q1, q2, similarity}) => {
+            console.log(`\n🔄 Similarity: ${(similarity * 100).toFixed(2)}%`);
+            console.log(`Q1: ${q1}`);
+            console.log(`Q2: ${q2}`);
+        });
+        allAnalysis.push({ file: path.basename(pdfFile), analysis });
+
+        // Get text for vector store
         const text = await extractTextFromPDF(pdfFile);
         allText += '\n' + text;
     }
-    return allText;
+    
+    return { allText, allAnalysis };
 }
 
 class QuestionAnalysisTool{
@@ -247,12 +261,18 @@ class QuestionAnalysisTool{
 async function initializeAI() {
     console.log("\n📂 Processing your PDF files...");
     const pdfDirectory = path.resolve("/Users/Harsha/Downloads/Harsha_Stuff/Projects/Agentic-Ai /notesParse/data");
-    const extractedText = await processMultiplePDFs(pdfDirectory);
+    const { allText, allAnalysis } = await processMultiplePDFs(pdfDirectory);
 
-    console.log("\n✅ Extracted Text (Preview):\n", extractedText.substring(0, 500), "...");
+    console.log("\n📊 Summary of Question Analysis:");
+    allAnalysis.forEach(({ file, analysis }) => {
+        console.log(`\n📑 File: ${file}`);
+        console.log(`Found ${analysis.length} sets of similar questions`);
+    });
+
+    console.log("\n✅ Extracted Text (Preview):\n", allText.substring(0, 500), "...");
 
     console.log("\n🔄 Storing notes for AI retrieval...");
-    const retriever = await storeNotesInVectorStore(extractedText);
+    const retriever = await storeNotesInVectorStore(allText);
     console.log("\n✅ Notes stored successfully! Setting up AI...");
     
     const chatModel = new ChatOllama({
