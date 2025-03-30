@@ -90,12 +90,28 @@ function findSimilarQuestion(questions){
 
 function extractQuestions(text) {
     console.log("extract questions from pdf")
-    const questionRegex = /^\s*(?:\d+[.)]?\s*)?(?:Question|Q)?\s*\d+\.\s+(.+)/gim;
+    // Updated regex to match questions with numbers at start and possible (a), (b) parts
+    const questionPatterns = [
+        // Main numbered questions (1, 2, 3, etc.)
+        /(?:\d+[\s.)])\s*([^()\n]+(?:\([a-z]\)[^()\n]+)*)/gim,
+        
+        // Sub-questions with (a), (b) format
+        /\(([a-z])\)\s*([^\n]+)/gim
+    ];
+
     const questions = [];
+    
+    // Process main questions
     let match;
-    while ((match = questionRegex.exec(text)) !== null) {
-        questions.push(match[3]);
-    }
+    questionPatterns.forEach(pattern => {
+        while ((match = pattern.exec(text)) !== null) {
+            const question = match[1]?.trim() || match[2]?.trim();
+            if (question) {
+                questions.push(question);
+            }
+        }
+    });
+
     console.log("\n✅ Questions extracted from PDF!");
     return questions;
 }
