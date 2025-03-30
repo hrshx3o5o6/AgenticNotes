@@ -3,6 +3,8 @@ import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
+import natural from "natural";  
+import { glob } from "glob";
 // import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import { OllamaEmbeddings } from "@langchain/ollama";
 import { TavilySearchResults } from "@langchain/community/tools/tavily_search";
@@ -25,9 +27,9 @@ const supabase = createClient(
 );
 
 // ✅ Fix PDF Path
-const pdfPath = path.resolve("/Users/Harsha/Downloads/Harsha_Stuff/Projects/Agentic-Ai /notesParse/data/data.pdf"); // Make sure this path is correct
-if (!fs.existsSync(pdfPath)) {
-    console.error(`❌ PDF file not found at path: ${pdfPath}`);
+const pdfDirectory = path.resolve("/Users/Harsha/Downloads/Harsha_Stuff/Projects/Agentic-Ai /notesParse/data"); // Make sure this path is correct
+if (!fs.existsSync(pdfDirectory)) {
+    console.error(`❌ PDF file not found at path: ${pdfDirectory}`);
     process.exit(1);
 }
 
@@ -48,6 +50,63 @@ async function extractTextFromPDF(pdfPath) {
         console.error("❌ Error processing PDF:", error);
         throw error;
     }
+}
+
+function cosineSimilarity(vec1, vec2) {
+    let dotProduct = 0, magA = 0, magB = 0;
+    for (let i = 0; i < vec1.length; i++) {
+        dotProduct += vec1[i] * vec2[i];
+        magA += vec1[i] ** 2;
+        magB += vec2[i] ** 2;
+    }
+    return dotProduct / (Math.sqrt(magA) * Math.sqrt(magB));
+}
+
+//function to extract similar questions from the pdf parsed
+function findSimilarQuestion(questions){
+    const tokenizer = new natural.WordTokenizer();
+    const tfidf = new natural.TfIdf();
+    
+    questions.forEach(q => { tfidf.addDocument(tokenizer.tokenize(q));
+    });
+
+    let similarQuestions = [];
+    for (let i = 0; i < questions.length; i++) {
+        for (let j = i + 1; j < questions.length; j++) {
+            let vec1 = [], vec2 = [];
+            tfidf.tfidfs(questions[i], (index, measure) => vec1[index] = measure);
+            tfidf.tfidfs(questions[j], (index, measure) => vec2[index] = measure);
+            let similarity = cosineSimilarity(vec1, vec2);
+
+            //let similarity = tfidf.tfidf(questions[i], j);
+            if (similarity > 0.6) { // Adjust threshold as needed
+                similarQuestions.push({ q1: questions[i], q2: questions[j], similarity });
+            }
+        }
+    }
+
+    return similarQuestions;
+}
+
+function extractQuestions(text) {
+    console.log("extract questions from pdf")
+    const questionRegex = /^\s*(?:\d+[.)]?\s*)?(?:Question|Q)?\s*\d+\.\s+(.+)/gim;
+    const questions = [];
+    let match;
+    while ((match = questionRegex.exec(text)) !== null) {
+        questions.push(match[3]);
+    }
+    console.log("\n✅ Questions extracted from PDF!");
+    return questions;
+}
+
+async function processExamPaper(pdfPath){
+    const text = await extractTextFromPDF(pdfPath);
+    const extractedQuestions = extractQuestions(text);
+    console.log("Extracted questions: ", extractedQuestions);
+    const similarQuestions = findSimilarQuestion(extractedQuestions);
+    console.log("Similar questions: ", similarQuestions);
+    return similarQuestions;
 }
 
 // ✅ Store extracted text in vector database
@@ -87,75 +146,114 @@ async function storeNotesInVectorStore(notesText) {
 }
 
 // ✅ Run the main function
-let executor;
-(async () => {
-    try {
-        console.log("\n📂 Processing your handwritten PDF...");
-        const extractedText = await extractTextFromPDF(pdfPath);
+// let executor;
+// (async () => {
+//     try {
+//         console.log("\n📂 Processing your handwritten PDF...");
+//         const extractedText = await extractTextFromPDF(pdfPath);
 
-        console.log("\n✅ Extracted Text (Preview):\n", extractedText.substring(0, 500), "...");
+//         console.log("\n✅ Extracted Text (Preview):\n", extractedText.substring(0, 500), "...");
 
-        console.log("\n🔄 Storing notes for AI retrieval...");
-        const retriever = await storeNotesInVectorStore(extractedText);
+//         console.log("\n🔄 Storing notes for AI retrieval...");
+//         const retriever = await storeNotesInVectorStore(extractedText);
 
-        console.log("\n✅ Notes stored successfully! Setting up AI...");
+//         console.log("\n✅ Notes stored successfully! Setting up AI...");
 
-        // ✅ Create AI model
-        const chatModel = new ChatOllama({
-            baseUrl: "http://localhost:11434",
-            model: "llama3.1:latest"
-        });
+//         // ✅ Create AI model
+//         const chatModel = new ChatOllama({
+//             baseUrl: "http://localhost:11434",
+//             model: "llama3.1:latest"
+//         });
 
-        // ✅ Create retriever & web search tools
-        const retrieverTool = createRetrieverTool(retriever, {
-            name: "notes-search",
-            description: "Searches and returns relevant information from handwritten notes.",
-        });
+//         // ✅ Create retriever & web search tools
+//         const retrieverTool = createRetrieverTool(retriever, {
+//             name: "notes-search",
+//             description: "Searches and returns relevant information from handwritten notes.",
+//         });
 
-        const webSearchTool = new TavilySearchResults({
-            apiKey: process.env.TAVILY_API_KEY,
-        });
+//         const webSearchTool = new TavilySearchResults({
+//             apiKey: process.env.TAVILY_API_KEY,
+//         });
 
-        const tools = [retrieverTool, webSearchTool];
+//         const tools = [retrieverTool, webSearchTool];
 
-        // ✅ Create Prompt
-        const prompt = ChatPromptTemplate.fromMessages([
-            ["system", "You are a helpful AI assistant that uses the provided PDF and tools to answer questions. Available tools: {tools}. Tool names: {tool_names}."],
-            ["human", "{input}"],
-            ["assistant", "{agent_scratchpad}"]
-        ]);
+//         // ✅ Create Prompt
+//         const prompt = ChatPromptTemplate.fromMessages([
+//             ["system", "You are a helpful AI assistant that uses the provided PDF and tools to answer questions. Available tools: {tools}. Tool names: {tool_names}."],
+//             ["human", "{input}"],
+//             ["assistant", "{agent_scratchpad}"]
+//         ]);
 
-        // ✅ Create AI Agent
-        const agent = await createReactAgent({
-            llm: chatModel,
-            tools: tools,
-            prompt: prompt,
-            outputParser: new StructuredOutputParser({
-                output_key: "answer",
-                verbose: true,
-            }),
-        });
+//         // ✅ Create AI Agent
+//         const agent = await createReactAgent({
+//             llm: chatModel,
+//             tools: tools,
+//             prompt: prompt,
+//             outputParser: new StructuredOutputParser({
+//                 output_key: "answer",
+//                 verbose: true,
+//             }),
+//         });
 
-        // ✅ Initialize the AI agent
-        const executor = new AgentExecutor({
-            agent,
-            tools,
-            verbose: true,
-        });
+//         // ✅ Initialize the AI agent
+//         const executor = new AgentExecutor({
+//             agent,
+//             tools,
+//             verbose: true,
+//         });
 
-        console.log("\n🎉 AI is ready! Run `node cli.js` to start chatting.");
+//         console.log("\n🎉 AI is ready! Run `node cli.js` to start chatting.");
 
-        // Fix the export for ES modules
+//         // Fix the export for ES modules
         
-    } catch (error) {
-        console.error("\n❌ Something went wrong:", error);
+//     } catch (error) {
+//         console.error("\n❌ Something went wrong:", error);
+//     }
+// })();
+
+async function processMultiplePDFs(pdfDirectory){
+    const pdfFiles = glob.sync(path.join(pdfDirectory, "*.pdf"));
+    console.log(`\n📂 Processing PDFs... Found ${pdfFiles.length} PDF files`);
+
+    let allText = '';
+    for ( const pdfFile of pdfFiles) {
+        console.log("\n📂 Processing PDF: ", pdfFile);
+        const text = await extractTextFromPDF(pdfFile);
+        allText += '\n' + text;
     }
-})();
+    return allText;
+}
+
+class QuestionAnalysisTool{
+    constructor() {
+        this.name = "question analysis";
+        this.description = "Analyzes the question and provides information about the question type similar questions in the documents uploaded.";
+    }
+
+    async _call(input){
+        const extractedQuestions = extractQuestions(input);
+        const similarQuestions = findSimilarQuestion(extractedQuestions);
+        return {
+            totalQuestions: extractedQuestions.length,
+            similarQuestions: similarQuestions,
+            message: `Found ${similarQuestions.length} pairs of similar questions in ${extractedQuestions.length} questions.`
+        };
+    }
+
+}
+
 
 // Create the initialization function
 async function initializeAI() {
-    const extractedText = await extractTextFromPDF(pdfPath);
+    console.log("\n📂 Processing your PDF files...");
+    const pdfDirectory = path.resolve("/Users/Harsha/Downloads/Harsha_Stuff/Projects/Agentic-Ai /notesParse/data");
+    const extractedText = await processMultiplePDFs(pdfDirectory);
+
+    console.log("\n✅ Extracted Text (Preview):\n", extractedText.substring(0, 500), "...");
+
+    console.log("\n🔄 Storing notes for AI retrieval...");
     const retriever = await storeNotesInVectorStore(extractedText);
+    console.log("\n✅ Notes stored successfully! Setting up AI...");
     
     const chatModel = new ChatOllama({
         baseUrl: "http://localhost:11434",
@@ -167,24 +265,26 @@ async function initializeAI() {
         description: "Searches and returns relevant information from handwritten notes.",
     });
 
+    const questionAnalysisTool = new QuestionAnalysisTool();
+
     const webSearchTool = new TavilySearchResults({
         apiKey: process.env.TAVILY_API_KEY,
     });
 
-    const voiceConvertTool = new VoiceConvertTool(retriever, {
-        name:"voice coverter tool", 
-        description: "Converts voice to text and searches and returns relevant information from handwritten notes and the web.",
-        // create a function that takes in a voice file and returns a text string
+    // const voiceConvertTool = new VoiceConvertTool(retriever, {
+    //     name:"voice coverter tool", 
+    //     description: "Converts voice to text and searches and returns relevant information from handwritten notes and the web.",
+    //     // create a function that takes in a voice file and returns a text string
         
 
-    }
-    );
+    // }
+    // );
     // write logic for voice converter from open ai whisperapis
 
-    const tools = [retrieverTool, webSearchTool, voiceConvertTool];
+    const tools = [retrieverTool, webSearchTool, questionAnalysisTool];
     
     const prompt = ChatPromptTemplate.fromMessages([
-        ["system", "You are a helpful AI assistant that uses the provided PDF and tools to answer questions. Available tools: {tools}. Tool names: {tool_names}."],
+        ["system", "You are a helpful AI assistant who helps user analysing previous year question papers using the provided PDF and tools to answer questions. Available tools: {tools}. Tool names: {tool_names}."],
         ["human", "{input}"],
         ["assistant", "{agent_scratchpad}"]
     ]);
@@ -204,4 +304,4 @@ async function initializeAI() {
 
 // Remove the IIFE and export the initialization function
 export { initializeAI };
-export { executor };
+// export { executor };
