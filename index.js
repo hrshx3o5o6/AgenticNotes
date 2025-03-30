@@ -3,7 +3,7 @@ import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
-import { MemoryVectorStore } from "langchain/vectorstores/memory";
+// import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import { OllamaEmbeddings } from "@langchain/ollama";
 import { TavilySearchResults } from "@langchain/community/tools/tavily_search";
 import { AgentExecutor, createOpenAIFunctionsAgent, createReactAgent } from "langchain/agents";
@@ -32,6 +32,7 @@ if (!fs.existsSync(pdfPath)) {
 }
 
 // ✅ Extract text from PDF (OCR for handwritten content)
+// function used for all sorts of pdfs
 async function extractTextFromPDF(pdfPath) {
     try {
         console.log("\n📂 Reading PDF:", pdfPath);
@@ -170,7 +171,17 @@ async function initializeAI() {
         apiKey: process.env.TAVILY_API_KEY,
     });
 
-    const tools = [retrieverTool, webSearchTool];
+    const voiceConvertTool = new VoiceConvertTool(retriever, {
+        name:"voice coverter tool", 
+        description: "Converts voice to text and searches and returns relevant information from handwritten notes and the web.",
+        // create a function that takes in a voice file and returns a text string
+        
+
+    }
+    );
+    // write logic for voice converter from open ai whisperapis
+
+    const tools = [retrieverTool, webSearchTool, voiceConvertTool];
     
     const prompt = ChatPromptTemplate.fromMessages([
         ["system", "You are a helpful AI assistant that uses the provided PDF and tools to answer questions. Available tools: {tools}. Tool names: {tool_names}."],
