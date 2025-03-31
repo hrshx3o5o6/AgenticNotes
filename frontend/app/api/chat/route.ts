@@ -83,12 +83,15 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    console.log("🔄 Received request...");
     const { message } = await request.json()
+    console.log("📩 Message from frontend:", message);
 
     if (!executor) {
       executor = await processAndAnalyze()
     }
 
+    console.log("Invoking AI");
     const result = await executor.invoke({
       input: message,
     })

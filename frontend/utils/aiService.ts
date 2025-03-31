@@ -8,6 +8,7 @@ import { SupabaseVectorStore } from '@langchain/community/vectorstores/supabase'
 import { createClient } from '@supabase/supabase-js'
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
+import { JsonOutputParser } from "@langchain/core/output_parsers";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -71,13 +72,20 @@ export async function processAndAnalyze() {
   const tools = [retrieverTool, webSearchTool, questionAnalysisTool]
 
   const prompt = ChatPromptTemplate.fromMessages([
-    ["system", "You are a helpful AI assistant that analyzes questions from uploaded PDFs. Available tools: {tools}. Tool names: {tool_names}."],
+    ["system", `You are a helpful AI assistant that analyzes questions from uploaded PDFs. 
+    You must ALWAYS structure your final response in this exact JSON format:
+    {
+      "response": "your detailed answer here",
+      "analysis": "your analysis of the question here",
+      "sources": "sources used for the answer"
+    }
+    Available tools: {tools}. Tool names: {tool_names}.`],
     ["human", "{input}"],
     ["assistant", "{agent_scratchpad}"]
   ])
 
   const agent = await createReactAgent({
-    llm: chatModel,
+    llm: chatModel, 
     tools: tools,
     prompt: prompt,
   })
@@ -86,5 +94,6 @@ export async function processAndAnalyze() {
     agent,
     tools,
     verbose: true,
+    returnIntermediateSteps: true,
   })
 }
