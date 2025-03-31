@@ -339,5 +339,5 @@ async function initializeAI() {
 }
 
 // Remove the IIFE and export the initialization function
-export { initializeAI };
+export { initializeAI, processExamPaper, processMultiplePDFs, extractQuestions, findSimilarQuestion };
 // export { executor };
