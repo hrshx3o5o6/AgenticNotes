@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js'
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 import { JsonOutputParser } from "@langchain/core/output_parsers";
+import { analyzeQuestions } from './questionService'
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -51,7 +52,7 @@ export async function processAndAnalyze() {
     apiKey: process.env.TAVILY_API_KEY,
   })
 
-  // Create question analysis tool
+  //Create question analysis tool
   const questionAnalysisTool = new DynamicStructuredTool({
     name: "question_analysis",
     description: "Analyzes questions and finds similar questions in the documents",
@@ -59,7 +60,7 @@ export async function processAndAnalyze() {
       question: z.string().describe("The question to analyze")
     }),
     func: async ({ question }) => {
-      const response = await fetch('/api/analyze-question', {
+      const response = await fetch('/api/analyse-question', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question })
@@ -67,9 +68,15 @@ export async function processAndAnalyze() {
       const result = await response.json()
       return JSON.stringify(result)
     }
+    // func: async ({ question }) => {
+    //   const analysis = await analyzeQuestions(question)
+    //   return JSON.stringify(analysis)
+    // }
   })
 
   const tools = [retrieverTool, webSearchTool, questionAnalysisTool]
+
+  const JsonParser = new JsonOutputParser();
 
   const prompt = ChatPromptTemplate.fromMessages([
     ["system", `You are a helpful AI assistant that analyzes questions from uploaded PDFs. 
