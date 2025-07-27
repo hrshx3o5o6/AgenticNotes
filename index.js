@@ -131,6 +131,7 @@ async function storeNotesInVectorStore(notesText) {
         model: "mistral:latest", 
         baseUrl: "http://localhost:11434", 
     });
+    //using mistral to convert text to vector embeddings
     
     const splitter = new RecursiveCharacterTextSplitter({
         chunkSize: 512,
@@ -341,3 +342,6 @@ async function initializeAI() {
 // Remove the IIFE and export the initialization function
 export { initializeAI, processExamPaper, processMultiplePDFs, extractQuestions, findSimilarQuestion };
 // export { executor };
+
+
+// haha cringe lol sample commit
