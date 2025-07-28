@@ -343,5 +343,3 @@ async function initializeAI() {
 export { initializeAI, processExamPaper, processMultiplePDFs, extractQuestions, findSimilarQuestion };
 // export { executor };
 
-
-// haha cringe lol sample commit
