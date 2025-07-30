@@ -18,7 +18,7 @@ const supabase = createClient(
 
 async function createRetriever() {
   const embeddings = new OllamaEmbeddings({
-    model: "mistral:latest",
+    model: "llama3.1:latest",
     baseUrl: "http://localhost:11434",
   })
 
